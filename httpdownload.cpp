@@ -33,7 +33,7 @@ void HttpDownload::on_downloadButton_clicked()
     while (it.hasNext())
     {
         it.next();
-        list.push_back(it.filePath().remove("/home/selman/GitChecker/HydraTableMaps/"));
+        list.push_back(it.filePath().remove(ui->localPath->text()));
     }
 
     download();
@@ -50,7 +50,7 @@ void HttpDownload::download()
     url = (ui->urlEdit->text() + fileToDownload);
 
     QFileInfo fileInfo(url.path());
-    QString fileName = "/home/selman/GitChecker/HydraTableMaps/tmp_" + fileInfo.fileName();
+    QString fileName = ui->localPath->text() + "tmp_" + fileInfo.fileName();
 
     if (QFile::exists(fileName))
     {
