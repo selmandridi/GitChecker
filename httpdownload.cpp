@@ -8,20 +8,13 @@ HttpDownload::HttpDownload(QWidget *parent) :
     index(0)
 {
     ui->setupUi(this);
-    ui->urlEdit->setText("https://raw.githubusercontent.com/selmandridi/BlackscreenDetector/master/");
+    ui->urlEdit->setText("https://raw.githubusercontent.com/webber04/HydraTableMaps/master/");
     ui->statusLabel->setWordWrap(true);
     ui->downloadButton->setDefault(true);
     ui->quitButton->setAutoDefault(false);
 
-    QDir directory("test/");
-    directory.setFilter(QDir::Files | QDir::NoDotAndDotDot | QDir::NoSymLinks);
+    ui->localPath->setText("/home/selman/GitChecker/HydraTableMaps/");
 
-    QDirIterator it(directory, QDirIterator::Subdirectories);
-    while (it.hasNext())
-    {
-        std::cout << it.next().toStdString() << std::endl;
-        list.push_back(it.filePath().remove("test/"));
-    }
     connect(ui->urlEdit, SIGNAL(textChanged(QString)), this, SLOT(enableDownloadButton()));
     connect(this, SIGNAL(nextFile()), this, SLOT(download()));
 }
@@ -33,6 +26,16 @@ HttpDownload::~HttpDownload()
 
 void HttpDownload::on_downloadButton_clicked()
 {
+    QDir directory(ui->localPath->text());
+    directory.setFilter(QDir::Files | QDir::NoDotAndDotDot | QDir::NoSymLinks);
+
+    QDirIterator it(directory, QDirIterator::Subdirectories);
+    while (it.hasNext())
+    {
+        it.next();
+        list.push_back(it.filePath().remove("/home/selman/GitChecker/HydraTableMaps/"));
+    }
+
     download();
 }
 
@@ -47,9 +50,10 @@ void HttpDownload::download()
     url = (ui->urlEdit->text() + fileToDownload);
 
     QFileInfo fileInfo(url.path());
-    QString fileName = "test/tmp_" + fileInfo.fileName();
+    QString fileName = "/home/selman/GitChecker/HydraTableMaps/tmp_" + fileInfo.fileName();
 
-    if (QFile::exists(fileName)) {
+    if (QFile::exists(fileName))
+    {
         if (QMessageBox::question(this, tr("HTTP"),
                 tr("There already exists a file called %1 in "
                 "the current directory. Overwrite?").arg(fileName),
@@ -60,7 +64,8 @@ void HttpDownload::download()
     }
 
     file = new QFile(fileName);
-    if (!file->open(QIODevice::WriteOnly)) {
+    if (!file->open(QIODevice::WriteOnly))
+    {
         QMessageBox::information(this, tr("HTTP"),
                       tr("Unable to save the file %1: %2.")
                       .arg(fileName).arg(file->errorString()));
@@ -129,21 +134,21 @@ void HttpDownload::cancelDownload()
 void HttpDownload::httpDownloadFinished()
 {
     // when canceled
-    if (httpRequestAborted) {
-        if (file) {
+    if (httpRequestAborted)
+    {
+        if (file)
+        {
             file->close();
             file->remove();
             delete file;
             file = 0;
         }
         reply->deleteLater();
-        ui->progressBar->hide();
         return;
     }
 
-    QString fileName = file->fileName();
+    QString downloadedFile = file->fileName();
     // download finished normally
-    ui->progressBar->hide();
     file->flush();
     file->close();
 
@@ -179,18 +184,20 @@ void HttpDownload::httpDownloadFinished()
 
     manager = 0;
 
-    QString fileToDownload = list.at(index);
+    QString localFile = ui->localPath->text() + list.at(index);
 
-    if (fileChecksum("test/" + fileToDownload, QCryptographicHash::Sha1) != fileChecksum(fileName, QCryptographicHash::Sha1))
+    //std::cout << "Local:" << localFile.toStdString() << std::endl;
+    //std::cout << "Remote:" << downloadedFile.toStdString() << std::endl;
+
+    if (fileChecksum(localFile, QCryptographicHash::Sha1) == fileChecksum(downloadedFile, QCryptographicHash::Sha1))
     {
-        std::cout << "FILE:" << fileToDownload.toStdString() << " is modified" << std::endl;
-
-        QFile("test/" + fileToDownload).remove();
-        file->copy("test/" + fileToDownload);
+        //std::cout << "" << localFile.toStdString() << " is the same" << std::endl;
     }
     else
     {
-        std::cout << "FILE:" << fileToDownload.toStdString() << " is the same" << std::endl;
+        std::cout << "" << localFile.toStdString() << " is modifed" << std::endl;
+        QFile(localFile).remove();
+        file->copy(localFile);
     }
 
     file->remove();
@@ -200,14 +207,15 @@ void HttpDownload::httpDownloadFinished()
 
     index++;
 
-
     if (index < list.size())
     {
         emit nextFile();
+        updateDownloadProgress(index, list.size());
     }
     else
     {
         index = 0;
+        updateDownloadProgress(list.size(), list.size());
         ui->downloadButton->setEnabled(true);
     }
 
@@ -225,22 +233,15 @@ void HttpDownload::startRequest(QUrl url)
 
     // Whenever more data is received from the network,
     // this readyRead() signal is emitted
-    connect(reply, SIGNAL(readyRead()),
-            this, SLOT(httpReadyRead()));
-
-    // Also, downloadProgress() signal is emitted when data is received
-    connect(reply, SIGNAL(downloadProgress(qint64,qint64)),
-            this, SLOT(updateDownloadProgress(qint64,qint64)));
+    connect(reply, SIGNAL(readyRead()), this, SLOT(httpReadyRead()));
 
     // This signal is emitted when the reply has finished processing.
     // After this signal is emitted,
     // there will be no more updates to the reply's data or metadata.
-    connect(reply, SIGNAL(finished()),
-            this, SLOT(httpDownloadFinished()));
+    connect(reply, SIGNAL(finished()), this, SLOT(httpDownloadFinished()));
 }
 
-QByteArray HttpDownload::fileChecksum(const QString &fileName,
-                        QCryptographicHash::Algorithm hashAlgorithm)
+QByteArray HttpDownload::fileChecksum(const QString &fileName, QCryptographicHash::Algorithm hashAlgorithm)
 {
     QFile file(fileName);
     QCryptographicHash hash(QCryptographicHash::Sha1);
@@ -250,23 +251,12 @@ QByteArray HttpDownload::fileChecksum(const QString &fileName,
         QByteArray header = QString("blob %1").arg(file.size()).toUtf8();
         hash.addData(header.data(), header.size() + 1);
         hash.addData(file.readAll());
-
     }
     else
     {
         std::cout << "Error opening " << fileName.toStdString() << std::endl;
     }
 
-
     file.close();
     return hash.result().toHex();
-
-//    QFile f(fileName);
-//    if (f.open(QFile::ReadOnly)) {
-//        QCryptographicHash hash(hashAlgorithm);
-//        if (hash.addData(&f)) {
-//            return hash.result();
-//        }
-//    }
-//    return QByteArray();
 }
