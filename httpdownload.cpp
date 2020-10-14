@@ -13,7 +13,7 @@ HttpDownload::HttpDownload(QWidget *parent) :
     ui->downloadButton->setDefault(true);
     ui->quitButton->setAutoDefault(false);
 
-    ui->localPath->setText("/home/selman/GitChecker/HydraTableMaps/");
+    ui->localPath->setText(QDir::toNativeSeparators("C:/Users/selma/Documents/GitChecker/HydraTableMaps/"));
 
     connect(ui->urlEdit, SIGNAL(textChanged(QString)), this, SLOT(enableDownloadButton()));
     connect(this, SIGNAL(nextFile()), this, SLOT(download()));
@@ -26,14 +26,14 @@ HttpDownload::~HttpDownload()
 
 void HttpDownload::on_downloadButton_clicked()
 {
-    QDir directory(ui->localPath->text());
+    QDir directory(QDir::toNativeSeparators(ui->localPath->text()));
     directory.setFilter(QDir::Files | QDir::NoDotAndDotDot | QDir::NoSymLinks);
 
     QDirIterator it(directory, QDirIterator::Subdirectories);
     while (it.hasNext())
     {
         it.next();
-        list.push_back(it.filePath().remove(ui->localPath->text()));
+        list.push_back((QDir::toNativeSeparators(it.filePath()).remove(QDir::toNativeSeparators(ui->localPath->text())).replace('\\', '/')));
     }
 
     download();
@@ -49,8 +49,10 @@ void HttpDownload::download()
     // get url
     url = (ui->urlEdit->text() + fileToDownload);
 
+    std::cout << "URL:" << (url.host() + url.path()).toStdString() << std::endl;
+
     QFileInfo fileInfo(url.path());
-    QString fileName = ui->localPath->text() + "tmp_" + fileInfo.fileName();
+    QString fileName = QDir::toNativeSeparators(ui->localPath->text()) + "tmp_" + fileInfo.fileName();
 
     if (QFile::exists(fileName))
     {
@@ -184,7 +186,7 @@ void HttpDownload::httpDownloadFinished()
 
     manager = 0;
 
-    QString localFile = ui->localPath->text() + list.at(index);
+    QString localFile = QDir::toNativeSeparators(ui->localPath->text()) + list.at(index);
 
     //std::cout << "Local:" << localFile.toStdString() << std::endl;
     //std::cout << "Remote:" << downloadedFile.toStdString() << std::endl;
